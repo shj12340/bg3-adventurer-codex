@@ -1,0 +1,3 @@
+'use strict';
+var CLASS_LIBRARY=[{id:'barbarian',name:'野蛮人',icon:'斧',role:'近战／投掷'},{id:'bard',name:'吟游诗人',icon:'曲',role:'远程／控制'},{id:'cleric',name:'牧师',icon:'光',role:'辅助／施法'},{id:'druid',name:'德鲁伊',icon:'星',role:'施法／变形'},{id:'fighter',name:'战士',icon:'剑',role:'近战／远程'},{id:'monk',name:'武僧',icon:'拳',role:'近战／机动'},{id:'paladin',name:'圣武士',icon:'誓',role:'近战／辅助'},{id:'ranger',name:'游侠',icon:'弓',role:'远程／探索'},{id:'rogue',name:'游荡者',icon:'影',role:'近战／潜行'},{id:'sorcerer',name:'术士',icon:'焰',role:'施法／爆发'},{id:'warlock',name:'邪术师',icon:'契',role:'施法／近战'},{id:'wizard',name:'法师',icon:'法',role:'施法／控制'}];
+globalThis.CLASS_LIBRARY=CLASS_LIBRARY;
