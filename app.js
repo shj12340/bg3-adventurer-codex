@@ -26,7 +26,10 @@ titles.laboratory=['构筑实验室','按职业、目标与机制偏好规划路
 const buildById=id=>BUILD_LIBRARY.find(build=>build.id===id);
 const gearById=id=>GEAR.find(gear=>gear.id===id);
 const classById=id=>CLASS_LIBRARY.find(klass=>klass.id===id);
-const buildRole=build=>`${build.subclass} ${build.split} ${build.rotation.join(' ')} ${build.risks.join(' ')}`;
+const buildRole=build=>[build.subclass,build.split,build.design?.goal,build.design?.engine,...build.rotation,...build.risks].join(' ');
+const includesClass=(build,id)=>!id||(build.entryClasses||[build.classId]).includes(id);
+const buildStars=build=>$('difficulty').value==='honour'?(build.honourStars||build.strengthStars):build.strengthStars;
+const visibleBuildPool=()=>BUILD_LIBRARY.filter(build=>($('build-scope')?.value||'all')==='all'||build.curated||($('difficulty').value==='explorer'&&!build.split.includes('/')));
 const sourceName=url=>{try{return new URL(url).hostname.replace(/^www\./,'');}catch{return url;}};
 const legacyFitLabels={
   'open-hand':'散打宗 · 连击武僧',giant:'巨人之道 · 巨人投掷',hexblade:'咒剑士 · 魅力近战',
@@ -42,7 +45,8 @@ function setupOptions(){
 
 function renderClassLibrary(){
   const buttons=[{id:'',name:'全部职业',icon:'Ⅲ',role:'显示所有流派'},...CLASS_LIBRARY];
-  $('class-library').innerHTML=buttons.map(klass=>{const count=klass.id?BUILD_LIBRARY.filter(build=>build.classId===klass.id).length:BUILD_LIBRARY.length;return `<button class="class-button" type="button" data-class="${klass.id}" aria-pressed="${state.classId===klass.id}"><span class="class-icon" aria-hidden="true">${escapeHTML(klass.icon)}</span><span><strong>${escapeHTML(klass.name)}</strong><small>${escapeHTML(klass.role)} · ${count} 套</small></span></button>`;}).join('');
+  const pool=visibleBuildPool();
+  $('class-library').innerHTML=buttons.map(klass=>{const count=pool.filter(build=>includesClass(build,klass.id)).length;return `<button class="class-button" type="button" data-class="${klass.id}" aria-pressed="${state.classId===klass.id}"><span class="class-icon" aria-hidden="true">${escapeHTML(klass.icon)}</span><span><strong>${escapeHTML(klass.name)}</strong><small>${escapeHTML(klass.role)} · ${count} 套</small></span></button>`;}).join('');
 }
 
 function renderOriginHints(origin){
@@ -53,17 +57,31 @@ function renderOriginHints(origin){
 
 function renderBuilds(){
   const classId=state.classId,role=$('style-filter').value,q=$('query').value.trim().toLowerCase(),difficulty=$('difficulty').value;
-  let list=BUILD_LIBRARY.filter(build=>(!classId||build.classId===classId)&&(!role||buildRole(build).includes(role))&&(!q||[build.name,build.subclass,build.split,build.tier,build.difficulty,...build.rotation,...build.risks].join(' ').toLowerCase().includes(q)));
+  let list=visibleBuildPool().filter(build=>includesClass(build,classId)&&(!role||buildRole(build).includes(role))&&(!q||[build.name,buildRole(build),build.design?.provenance].join(' ').toLowerCase().includes(q)));
+  list.sort((a,b)=>Number(b.curated)-Number(a.curated)||buildStars(b)-buildStars(a));
   if(difficulty==='explorer')list=list.filter(build=>!build.split.includes('/'));
   const selectedClass=classById(classId);
   $('result-count').textContent=`${selectedClass?selectedClass.name+' · ':''}找到 ${list.length} 套构筑`;
   $('difficulty-note').hidden=false;
-  $('difficulty-note').textContent=difficulty==='honour'?'荣誉模式：请先阅读每套构筑的风险与条件；本手册不把旧版额外攻击叠加写成通用结论。':difficulty==='explorer'?'探索者：仅显示单职业构筑，便于学习基础职业循环；切换到平衡或战术可查看多职业路线。':difficulty==='balanced'?'平衡：显示完整构筑库；按自己偏好的复杂度、职业与配装筛选。':'战术：显示完整构筑库；优先阅读每套构筑的风险、装备竞争与等级条件。';
-  $('build-grid').innerHTML=list.length?list.map(build=>`<article class="build-card"><div class="card-head"><span class="tag recommend">${escapeHTML(build.tier)}</span><span class="sigil">${escapeHTML(classById(build.classId)?.icon||'Ⅲ')}</span></div><h2>${escapeHTML(build.name)}</h2><p class="split">${escapeHTML(build.split)}</p><p class="summary">${escapeHTML(build.rotation[0])}</p><p class="build-stars" aria-label="强度 ${build.strengthStars} 星，满分 5 星">${'★'.repeat(build.strengthStars)}${'☆'.repeat(5-build.strengthStars)} <small>强度参考</small></p><div class="card-meta"><span>${escapeHTML(classById(build.classId)?.name||build.classId)}</span><span>${escapeHTML(build.difficulty)}</span><span>${escapeHTML(build.version)}</span></div><div class="card-bottom"><span>${escapeHTML(build.subclass)}</span><button class="action" type="button" data-build="${build.id}">查看升级与配装 →</button></div></article>`).join(''):'<div class="empty">没有匹配构筑。试试切换职业或重置筛选。</div>';
+  $('difficulty-note').textContent=difficulty==='explorer'?'探索者：仅显示单职业构筑；原版此难度不能直接兼职，可临时切换难度升级。':'星级按'+(difficulty==='honour'?'荣誉':'战术／平衡')+'规则与满级成装评估，不预设无限资源。力量灵药、受惊和关键装备条件分别写在详情里。同一套构筑会关联多个核心职业。';
+  $('build-grid').innerHTML=list.length?list.map(build=>`<article class="build-card"><div class="card-head"><span class="tag recommend">${escapeHTML(build.tier)}</span><span class="sigil">${escapeHTML(classById(build.classId)?.icon||'Ⅲ')}</span></div><h2>${escapeHTML(build.name)}</h2><p class="split">${escapeHTML(build.split)}</p><p class="summary">${escapeHTML(build.design?.engine||build.rotation[0])}</p><p class="build-stars" aria-label="强度 ${buildStars(build)} 星，满分 5 星">${'★'.repeat(buildStars(build))}${'☆'.repeat(5-buildStars(build))} <small>${$('difficulty').value==='honour'?'荣誉':'战术／平衡'}</small></p><div class="card-meta"><span>${escapeHTML(classById(build.classId)?.name||build.classId)}</span><span>${escapeHTML(build.difficulty)}</span><span>${escapeHTML(build.version)}</span></div><div class="card-bottom"><span>${escapeHTML(build.subclass)}</span><button class="action" type="button" data-build="${build.id}">查看升级与配装 →</button></div></article>`).join(''):'<div class="empty">没有匹配构筑。试试切换职业或重置筛选。</div>';
 }
 
 const gearActLabel=gear=>gear.act==='special'?'特殊获取':`第${gear.act}章`;
 function gearList(ids){return ids.map(gearById).filter(Boolean).map(gear=>`<li><strong>${escapeHTML(gear.name)}</strong> <span>${gearActLabel(gear)} · ${escapeHTML(gear.slot)}</span><br>${escapeHTML(gear.effect)}</li>`).join('');}
+function renderBuildReasoning(build){
+  const d=build.design;if(!d)return '<p class="notice">主题／其他路线：保留供比较，强度优先请查看推荐路线。</p>';
+  const list=items=>'<ul class="detail-list">'+items.map(item=>'<li>'+escapeHTML(item)+'</li>').join('')+'</ul>';
+  const abilityNames=['力量','敏捷','体质','智力','感知','魅力'];
+  return '<section class="build-reasoning"><p class="eyebrow">构筑推导 · '+escapeHTML(d.goal)+'</p>'+
+    '<h3>开卡属性</h3><div class="ability-grid">'+d.attributes.map((value,i)=>'<div><span>'+abilityNames[i]+'</span><strong>'+value+'</strong></div>').join('')+'</div><p class="muted">'+escapeHTML(d.attributeNote)+'</p>'+
+    '<h3>成型节点</h3>'+list(d.breakpoints)+
+    '<div class="tradeoff-grid"><section><h3>这些等级换来了什么</h3>'+list(d.gains)+'</section><section><h3>为此放弃了什么</h3>'+list(d.costs)+'</section></div>'+
+    '<h3>为什么选它，而不是相近方案</h3><p>'+escapeHTML(d.comparison)+'</p>'+
+    '<h3>资源与装备条件</h3><p>'+escapeHTML(d.resources)+'</p>'+
+    '<p class="muted">评分：战术／平衡 '+build.strengthStars+' 星 · 荣誉 '+build.honourStars+' 星。'+escapeHTML(d.ratingNote)+'</p>'+
+    '<p class="strategy-origin">'+escapeHTML(d.provenance)+'</p></section>';
+}
 function renderBuildDetail(buildId){
   const build=buildById(buildId);if(!build)return;
   const plan=build.gearPlan||{core:[],strong:[],replacements:[]};
@@ -74,8 +92,8 @@ function renderBuildDetail(buildId){
   originEntries.forEach(item=>{const origin=item.origin||selectedOrigin||'相关角色',key=`${origin}\u0000${item.note}`;if(seenOriginNotes.has(key))return;seenOriginNotes.add(key);originGroups.set(origin,[...(originGroups.get(origin)||[]),item.note]);});
   const originNotes=[...originGroups].map(([origin,notes])=>`<li><strong>${escapeHTML(origin)}</strong>：${notes.map(escapeHTML).join('；')}</li>`).join('');
   const alternatives=plan.replacements.map(item=>{const target=gearById(item.for),choices=item.alternatives.map(gearById).filter(Boolean);return `<li><strong>${escapeHTML(target?.name||item.for)}</strong> 的替代：${choices.map(choice=>escapeHTML(choice.name)).join('、')}<br>${escapeHTML(item.reason)}${item.fallback?`<br><span class="muted">${escapeHTML(item.fallback.mode)}：${escapeHTML(item.fallback.reason)}</span>`:''}</li>`;}).join('');
-  const buildAdvice=`<section class="build-advice"><h3>强度 ${'★'.repeat(build.strengthStars)}${'☆'.repeat(5-build.strengthStars)}</h3><p>${escapeHTML(build.strengthWhy)}</p><p class="muted">五星是相对强度参考，不保证任何难度或装备状态下的表现；兼职收益见逐级路线，荣誉模式差异见风险。</p><h3>推荐武器</h3><ul class="detail-list">${build.recommendedWeapons.map(name=>`<li>${escapeHTML(name)}</li>`).join('')}</ul><h3>推荐法术</h3>${build.recommendedSpells.length?`<ul class="detail-list">${build.recommendedSpells.map(name=>`<li>${escapeHTML(name)}</li>`).join('')}</ul>`:'<p>无必须选择的施法路线；以职业技能和武器攻击为主。</p>'}</section>`;
-  $('build-detail').innerHTML=`<p class="eyebrow">${escapeHTML(classById(build.classId)?.name||build.classId)} · ${escapeHTML(build.subclass)}</p><h2 id="detail-title" class="detail-title">${escapeHTML(build.name)}</h2><p class="split">${escapeHTML(build.split)}</p><div class="detail-badges"><span class="tag recommend">${escapeHTML(build.tier)}</span><span class="tag">${escapeHTML(build.difficulty)}</span><span class="tag">${escapeHTML(build.version)}</span><span class="tag">核对 ${escapeHTML(build.checkedAt)}</span></div>${buildAdvice}<div class="detail-columns"><div><h3>1–12级路线</h3><table class="level-table"><thead><tr><th>等级</th><th>选择与理由</th></tr></thead><tbody>${build.levels.map((level,index)=>`<tr><td>${index+1}</td><td><strong>${escapeHTML(level[0])}</strong><br>${escapeHTML(level[1])}</td></tr>`).join('')}</tbody></table><h3>实战循环</h3><ol class="detail-list">${build.rotation.map(step=>`<li>${escapeHTML(step)}</li>`).join('')}</ol><h3>风险与使用条件</h3><ul class="detail-list risk-list">${build.risks.map(risk=>`<li>${escapeHTML(risk)}</li>`).join('')}</ul></div><div><h3>核心装备</h3><ul class="detail-list gear-plan">${gearList(plan.core)}</ul><h3>强力补件</h3><ul class="detail-list gear-plan">${gearList(plan.strong)}</ul><h3>替代路线</h3><ul class="detail-list">${alternatives||'<li>暂无额外替代说明。</li>'}</ul><h3>角色微调</h3><p class="no-lock">选择角色不会锁定职业</p><ul class="detail-list">${originNotes||'<li>此构筑没有选中角色的专属微调。</li>'}</ul><h3>资料来源</h3><ul class="detail-list source-list">${build.sources.map(url=>`<li><a class="source" href="${escapeHTML(url)}" target="_blank" rel="noopener">${escapeHTML(sourceName(url))} ↗</a></li>`).join('')}</ul></div></div>`;
+  const buildAdvice=`<section class="build-advice"><h3>强度 ${'★'.repeat(buildStars(build))}${'☆'.repeat(5-buildStars(build))}</h3><p>${escapeHTML(build.strengthWhy)}</p><p class="muted">五星是相对强度参考，不保证任何难度或装备状态下的表现；兼职收益见逐级路线，荣誉模式差异见风险。</p><h3>推荐武器</h3><ul class="detail-list">${build.recommendedWeapons.map(name=>`<li>${escapeHTML(name)}</li>`).join('')}</ul><h3>推荐法术</h3>${build.recommendedSpells.length?`<ul class="detail-list">${build.recommendedSpells.map(name=>`<li>${escapeHTML(name)}</li>`).join('')}</ul>`:'<p>无必须选择的施法路线；以职业技能和武器攻击为主。</p>'}</section>${renderBuildReasoning(build)}`;
+  $('build-detail').innerHTML=`<p class="eyebrow">${escapeHTML(classById(build.classId)?.name||build.classId)} · ${escapeHTML(build.subclass)}</p><h2 id="detail-title" class="detail-title">${escapeHTML(build.name)}</h2><p class="split">${escapeHTML(build.split)}</p><div class="detail-badges"><span class="tag recommend">${escapeHTML(build.tier)}</span><span class="tag">${escapeHTML(build.difficulty)}</span><span class="tag">${escapeHTML(build.version)}</span><span class="tag">核对 ${escapeHTML(build.strategyReviewedAt||build.checkedAt)}</span></div>${buildAdvice}<div class="detail-columns"><div><h3>1–12级路线</h3><table class="level-table"><thead><tr><th>等级</th><th>选择与理由</th></tr></thead><tbody>${build.levels.map((level,index)=>`<tr><td>${index+1}</td><td><strong>${escapeHTML(level[0])}</strong><br>${escapeHTML(level[1])}</td></tr>`).join('')}</tbody></table><h3>实战循环</h3><ol class="detail-list">${build.rotation.map(step=>`<li>${escapeHTML(step)}</li>`).join('')}</ol><h3>风险与使用条件</h3><ul class="detail-list risk-list">${build.risks.map(risk=>`<li>${escapeHTML(risk)}</li>`).join('')}</ul></div><div><h3>核心装备</h3><ul class="detail-list gear-plan">${gearList(plan.core)}</ul><h3>强力补件</h3><ul class="detail-list gear-plan">${gearList(plan.strong)}</ul><h3>替代路线</h3><ul class="detail-list">${alternatives||'<li>暂无额外替代说明。</li>'}</ul><h3>角色微调</h3><p class="no-lock">选择角色不会锁定职业</p><ul class="detail-list">${originNotes||'<li>此构筑没有选中角色的专属微调。</li>'}</ul><h3>资料来源</h3><ul class="detail-list source-list">${build.sources.map(url=>`<li><a class="source" href="${escapeHTML(url)}" target="_blank" rel="noopener">${escapeHTML(sourceName(url))} ↗</a></li>`).join('')}</ul></div></div>`;
   const dialog=$('build-dialog');if(!dialog.open)dialog.showModal();dialog.scrollTop=0;document.body.style.overflow='hidden';
 }
 
@@ -214,9 +232,9 @@ function renderBuildLab(){
 }
 function route(){let view=location.hash.slice(1)||'builds';if(view==='quests')view='inspirations';if(!titles[view])view='builds';document.querySelectorAll('.view').forEach(section=>section.hidden=section.id!==view);document.querySelectorAll('nav a').forEach(link=>{const active=link.getAttribute('href')===`#${view}`;link.classList.toggle('active',active);active?link.setAttribute('aria-current','page'):link.removeAttribute('aria-current');});$('page-title').textContent=titles[view][0];$('page-description').textContent=titles[view][1];document.title=`${titles[view][0]} · 费伦冒险手册`;}
 
-['character','difficulty','style-filter'].forEach(id=>$(id).addEventListener('change',()=>{if(id==='character')renderOriginHints($('character').value);renderBuilds();}));
+['character','difficulty','style-filter','build-scope'].forEach(id=>$(id)?.addEventListener('change',()=>{if(id==='character')renderOriginHints($('character').value);renderClassLibrary();renderBuilds();}));
 $('query').addEventListener('input',renderBuilds);
-$('reset').addEventListener('click',()=>{$('character').value='';$('difficulty').value='tactician';$('style-filter').value='';$('query').value='';state.classId='';renderClassLibrary();renderOriginHints('');renderBuilds();});
+$('reset').addEventListener('click',()=>{$('character').value='';$('difficulty').value='tactician';$('style-filter').value='';$('query').value='';if($('build-scope'))$('build-scope').value='recommended';state.classId='';renderClassLibrary();renderOriginHints('');renderBuilds();});
 ['gear-query','gear-act','gear-build','gear-slot','gear-tier'].forEach(id=>$(id).addEventListener(id==='gear-query'?'input':'change',renderGear));
 $('act-one-show-spoilers').addEventListener('change',event=>{state.actOneShowSpoilers=event.target.checked;renderActOneOverview();renderActOneSteps();});
 $('act-one-low-spoiler').addEventListener('change',event=>{if(event.target.checked){state.actOneShowSpoilers=false;renderActOneOverview();renderActOneSteps();}});
