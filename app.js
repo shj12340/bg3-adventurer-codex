@@ -146,7 +146,7 @@ function renderInspirations(){
   const query=$('inspiration-query').value.trim().toLocaleLowerCase();
   const rows=INSPIRATIONS.filter(item=>(!background||item.background===background)&&(!character||item.character.split('、').includes(character))&&(!query||`${item.title} ${item.detail} ${item.background} ${item.character}`.toLocaleLowerCase().includes(query)));
   $('inspiration-count').textContent=`找到 ${rows.length} / ${INSPIRATIONS.length} 条激励点`;
-  $('inspiration-list').innerHTML=rows.length?rows.map(item=>`<article class="inspiration-card"><div class="inspiration-meta"><span class="tag">${escapeHTML(item.background)}</span><span>${escapeHTML(item.character)}</span><span>原 PDF 第 ${item.page} 页</span></div><h2>${escapeHTML(item.title)}</h2><p>${escapeHTML(item.detail)}</p></article>`).join(''):'<p class="empty">没有符合条件的激励点。试试清除筛选。</p>';
+  $('inspiration-list').innerHTML=rows.length?rows.map(item=>`<article class="inspiration-card"><div class="inspiration-meta"><span class="tag">${escapeHTML(item.background)}</span><span>${escapeHTML(item.character)}</span><span>${item.chapter==='其他'?'其他':`第${['','一','二','三'][item.chapter]}章`}</span></div><h2>${escapeHTML(item.title)}</h2><p>${escapeHTML(item.detail)}</p></article>`).join(''):'<p class="empty">没有符合条件的激励点。试试清除筛选。</p>';
 }
 const labGoalLabels={'melee-burst':'近战爆发','ranged-sustain':'远程持续','spell-burst':'法术爆发',control:'控场',healing:'治疗减伤',throwing:'投掷',summon:'召唤',exploration:'探索功能'};
 const labDimensionLabels={pressure:'输出／压制',survival:'生存',actionEconomy:'行动经济',smoothness:'成型平滑度',resourceEfficiency:'资源效率',gearDependence:'装备依赖'};
