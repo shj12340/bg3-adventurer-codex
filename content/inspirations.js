@@ -765,7 +765,7 @@ const INSPIRATIONS = [
   },
   {
     "title": "是谁杀了我",
-    "detail": "欺骗豺狼人头§弗林德吃掉自己。",
+    "detail": "欺骗豺狼人头目弗林德吃掉自己。",
     "background": "骗子",
     "character": "阿斯代伦",
     "page": 10
@@ -1458,7 +1458,7 @@ const INSPIRATIONS = [
   },
   {
     "title": "越狱",
-    "detail": "解救月出之塔所有囚犯〗",
+    "detail": "解救月出之塔所有囚犯",
     "background": "平民英雄",
     "character": "威尔、明斯克",
     "page": 19
