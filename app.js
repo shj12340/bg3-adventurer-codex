@@ -16,12 +16,12 @@ function saveActTwoProgress(progress){try{window.localStorage.setItem(ACT_TWO_PR
 function loadActThreeProgress(){try{const parsed=JSON.parse(window.localStorage.getItem(ACT_THREE_PROGRESS_KEY));return new Set(Array.isArray(parsed)?parsed.filter(id=>typeof id==='string'&&actThreeStepIds.has(id)):[]);}catch{return new Set();}}
 function saveActThreeProgress(progress){try{window.localStorage.setItem(ACT_THREE_PROGRESS_KEY,JSON.stringify([...progress]));}catch{/* Storage can be unavailable; in-memory progress remains usable. */}}
 function loadJourneyAct(){try{const act=Number(window.localStorage.getItem('bg3-codex-journey-act'));return [1,2,3].includes(act)?act:1;}catch{return 1;}}
-const state={classId:'',journey:loadJourneyAct(),quests:1,selectedRegion:'',actOneModule:ACT_ONE_MODULES[0].id,actTwoModule:ACT_TWO_MODULES[0].id,actThreeModule:ACT_THREE_MODULES[0].id,actOneProgress:loadActOneProgress(),actTwoProgress:loadActTwoProgress(),actThreeProgress:loadActThreeProgress(),actOneShowSpoilers:false,actOneOnlyUnfinished:false,actOneOnlyEquipment:false,gearReturnStep:'',pendingReturnStep:''};
+const state={classId:'',journey:loadJourneyAct(),selectedRegion:'',actOneModule:ACT_ONE_MODULES[0].id,actTwoModule:ACT_TWO_MODULES[0].id,actThreeModule:ACT_THREE_MODULES[0].id,actOneProgress:loadActOneProgress(),actTwoProgress:loadActTwoProgress(),actThreeProgress:loadActThreeProgress(),actOneShowSpoilers:false,actOneOnlyUnfinished:false,actOneOnlyEquipment:false,gearReturnStep:'',pendingReturnStep:''};
 const walkthroughModules=()=>state.journey===3?ACT_THREE_MODULES:state.journey===2?ACT_TWO_MODULES:ACT_ONE_MODULES;
 const walkthroughSteps=()=>state.journey===3?ACT_THREE_STEPS:state.journey===2?ACT_TWO_STEPS:ACT_ONE_STEPS;
 const walkthroughModule=()=>state.journey===3?state.actThreeModule:state.journey===2?state.actTwoModule:state.actOneModule;
 const walkthroughProgress=()=>state.journey===3?state.actThreeProgress:state.journey===2?state.actTwoProgress:state.actOneProgress;
-const titles={builds:['找到属于你的战斗方式','先选职业主轴，再把每一级、每件装备与每次冒险连在一起。'],journey:['分章节冒险流程','按区域和不可逆节点推进，不错过重要救援、商人和装备。'],equipment:['构筑向装备图鉴','按 BD、章节、部位和推荐强度筛选；先看为什么适合，再决定给谁。'],quests:['任务与剧情路线','默认不展示结局，展开后才显示关键分支与错过风险。']};
+const titles={builds:['找到属于你的战斗方式','先选职业主轴，再把每一级、每件装备与每次冒险连在一起。'],journey:['分章节冒险流程','按区域和不可逆节点推进，不错过重要救援、商人和装备。'],equipment:['构筑向装备图鉴','按 BD、章节、部位和推荐强度筛选；先看为什么适合，再决定给谁。'],inspirations:['角色激励点','按背景、起源与角色查找激励事件及触发提示。']};
 titles.laboratory=['构筑实验室','按职业、目标与机制偏好规划路线，查看每一颗星和每一级选择的依据。'];
 const buildById=id=>BUILD_LIBRARY.find(build=>build.id===id);
 const gearById=id=>GEAR.find(gear=>gear.id===id);
@@ -133,7 +133,21 @@ function renderRegionGuides(act){
   $('journey-content').innerHTML=selected?`<article class="region-card"><div class="region-heading"><div><p class="eyebrow">区域攻略 · ${escapeHTML(selected.levelRange)}</p><h2>${escapeHTML(selected.name)}</h2></div><a class="source" href="${escapeHTML(selected.sources[0])}" target="_blank" rel="noopener">区域资料 ↗</a></div><dl class="region-facts"><div><dt>如何进入</dt><dd>${escapeHTML(selected.entry)}</dd></div><div><dt>进入前准备</dt><dd>${escapeHTML(selected.prepare)}</dd></div><div><dt>推荐顺序</dt><dd>${escapeHTML(selected.order)}</dd></div></dl><h3>关键遭遇</h3><ul class="detail-list">${selected.encounters.map(item=>`<li>${escapeHTML(item)}</li>`).join('')}</ul><h3>区域装备</h3><ul class="detail-list">${selected.rewards.gearIds.length?selected.rewards.gearIds.map(id=>`<li>${escapeHTML(gearById(id)?.name||id)}</li>`).join(''):'<li>本区以推进、补给或线索为主。</li>'}</ul><p class="muted">${escapeHTML(selected.rewards.note)}</p><section class="region-warning" aria-label="进入前风险"><h3>进入前风险</h3><ul>${selected.warnings.map(warning=>`<li>${selected.id==='moonrise-towers'?`<strong>此处会锁定救援任务：</strong> ${escapeHTML(warning)}`:escapeHTML(warning)}</li>`).join('')}</ul></section><details class="region-spoilers"><summary>剧情结果（含剧透）</summary><ul>${selected.spoilers.map(spoiler=>`<li>${escapeHTML(spoiler)}</li>`).join('')}</ul></details></article>`:'<div class="empty">本章暂时没有区域攻略。</div>';
 }
 function renderJourney(){chapterTabs('journey');$('journey').querySelector('.act-one-walkthrough').hidden=false;renderActOne();renderRegionGuides(state.journey);}
-function renderQuests(){chapterTabs('quests');$('quest-list').innerHTML=QUESTS.filter(quest=>quest.act===state.quests).map(quest=>`<article class="quest"><span class="tag">${escapeHTML(quest.tag)}</span><h2>${escapeHTML(quest.name)}</h2><p><strong>从哪里开始</strong> · ${escapeHTML(quest.start)}</p><p>${escapeHTML(quest.guide)}</p><details><summary>剧情与分支 · 点击显示剧透</summary><p>${escapeHTML(quest.spoiler)}</p></details><a class="source" href="${escapeHTML(wiki(quest.url))}" target="_blank" rel="noopener">查看任务资料 ↗</a></article>`).join('');}
+function setupInspirations(){
+  const backgrounds=[...new Set(INSPIRATIONS.map(item=>item.background))];
+  $('inspiration-background').insertAdjacentHTML('beforeend',backgrounds.map(name=>`<option value="${escapeHTML(name)}">${escapeHTML(name)} · ${INSPIRATIONS.filter(item=>item.background===name).length} 条</option>`).join(''));
+  const characters=[...new Set(INSPIRATIONS.flatMap(item=>item.character.split('、')).filter(name=>name!=='自建角色'))];
+  $('inspiration-character').insertAdjacentHTML('beforeend',characters.map(name=>`<option value="${escapeHTML(name)}">${escapeHTML(name)}</option>`).join(''));
+  ['inspiration-background','inspiration-character','inspiration-query'].forEach(id=>$(id).addEventListener(id==='inspiration-query'?'input':'change',renderInspirations));
+}
+function renderInspirations(){
+  const background=$('inspiration-background').value;
+  const character=$('inspiration-character').value;
+  const query=$('inspiration-query').value.trim().toLocaleLowerCase();
+  const rows=INSPIRATIONS.filter(item=>(!background||item.background===background)&&(!character||item.character.split('、').includes(character))&&(!query||`${item.title} ${item.detail} ${item.background} ${item.character}`.toLocaleLowerCase().includes(query)));
+  $('inspiration-count').textContent=`找到 ${rows.length} / ${INSPIRATIONS.length} 条激励点`;
+  $('inspiration-list').innerHTML=rows.length?rows.map(item=>`<article class="inspiration-card"><div class="inspiration-meta"><span class="tag">${escapeHTML(item.background)}</span><span>${escapeHTML(item.character)}</span><span>原 PDF 第 ${item.page} 页</span></div><h2>${escapeHTML(item.title)}</h2><p>${escapeHTML(item.detail)}</p></article>`).join(''):'<p class="empty">没有符合条件的激励点。试试清除筛选。</p>';
+}
 const labGoalLabels={'melee-burst':'近战爆发','ranged-sustain':'远程持续','spell-burst':'法术爆发',control:'控场',healing:'治疗减伤',throwing:'投掷',summon:'召唤',exploration:'探索功能'};
 const labDimensionLabels={pressure:'输出／压制',survival:'生存',actionEconomy:'行动经济',smoothness:'成型平滑度',resourceEfficiency:'资源效率',gearDependence:'装备依赖'};
 const labExploitLabels={'infinite-spell-slots':'无限法术位','merchant-refresh-theft':'商人库存／偷窃刷新','camp-persistent-buffs':'营地长期增益'};
@@ -197,7 +211,7 @@ function renderBuildLab(){
   $('build-lab-results').innerHTML=results.map((result,index)=>labResultCard(result,input,index)).join('');
   $('build-lab-status').textContent=results.length?`已生成 ${results.length} 条路线。当前选择：${classById(input.classId)?.name||'尚未决定职业'} · ${labGoalLabels[input.goalId]}。展开卡片查看选择依据。`:'没有符合当前职业与目标的路线。请更换战斗目标，或将起点职业设为“尚未决定”。';
 }
-function route(){let view=location.hash.slice(1)||'builds';if(!titles[view])view='builds';document.querySelectorAll('.view').forEach(section=>section.hidden=section.id!==view);document.querySelectorAll('nav a').forEach(link=>{const active=link.getAttribute('href')===`#${view}`;link.classList.toggle('active',active);active?link.setAttribute('aria-current','page'):link.removeAttribute('aria-current');});$('page-title').textContent=titles[view][0];$('page-description').textContent=titles[view][1];document.title=`${titles[view][0]} · 费伦冒险手册`;}
+function route(){let view=location.hash.slice(1)||'builds';if(view==='quests')view='inspirations';if(!titles[view])view='builds';document.querySelectorAll('.view').forEach(section=>section.hidden=section.id!==view);document.querySelectorAll('nav a').forEach(link=>{const active=link.getAttribute('href')===`#${view}`;link.classList.toggle('active',active);active?link.setAttribute('aria-current','page'):link.removeAttribute('aria-current');});$('page-title').textContent=titles[view][0];$('page-description').textContent=titles[view][1];document.title=`${titles[view][0]} · 费伦冒险手册`;}
 
 ['character','difficulty','style-filter'].forEach(id=>$(id).addEventListener('change',()=>{if(id==='character')renderOriginHints($('character').value);renderBuilds();}));
 $('query').addEventListener('input',renderBuilds);
@@ -223,7 +237,7 @@ document.addEventListener('click',event=>{
   if(returnButton){const step=[...ACT_ONE_STEPS,...ACT_TWO_STEPS,...ACT_THREE_STEPS].find(item=>item.id===returnButton.dataset.returnStep);if(!step)return;state.journey=step.id.startsWith('act3-')?3:step.id.startsWith('act2-')?2:1;if(state.journey===3)state.actThreeModule=step.moduleId;else if(state.journey===2)state.actTwoModule=step.moduleId;else state.actOneModule=step.moduleId;state.actOneOnlyUnfinished=false;state.actOneOnlyEquipment=false;$('act-one-only-unfinished').checked=false;$('act-one-only-equipment').checked=false;state.pendingReturnStep=step.id;renderJourney();location.hash='journey';return;}
   const classButton=event.target.closest('[data-class]');if(classButton){state.classId=classButton.dataset.class;renderClassLibrary();renderBuilds();return;}
   const buildButton=event.target.closest('[data-build]');if(buildButton){renderBuildDetail(buildButton.dataset.build);return;}
-  const tab=event.target.closest('[data-view][data-act]');if(tab){state[tab.dataset.view]=Number(tab.dataset.act);if(tab.dataset.view==='journey'){try{localStorage.setItem('bg3-codex-journey-act',String(state.journey));}catch{}state.selectedRegion='';renderJourney();}else renderQuests();return;}
+  const tab=event.target.closest('[data-view][data-act]');if(tab){state.journey=Number(tab.dataset.act);try{localStorage.setItem('bg3-codex-journey-act',String(state.journey));}catch{}state.selectedRegion='';renderJourney();return;}
   const regionButton=event.target.closest('[data-region]');if(regionButton){const region=REGION_GUIDES.find(item=>item.id===regionButton.dataset.region);state.selectedRegion=regionButton.dataset.region;state.journey=region?.act||state.journey;renderJourney();return;}
 });
 $('close-dialog').addEventListener('click',()=>$('build-dialog').close());$('build-dialog').addEventListener('close',()=>document.body.style.overflow='');window.addEventListener('hashchange',()=>{route();if(state.pendingReturnStep&&location.hash==='#journey'){const id=state.pendingReturnStep;state.pendingReturnStep='';requestAnimationFrame(()=>{const target=document.getElementById(`act-one-step-${id}`);target?.scrollIntoView({block:'start'});target?.focus({preventScroll:true});});}else scrollTo(0,0);});
@@ -236,4 +250,4 @@ $('build-lab-results').addEventListener('click',event=>{
   renderGear();location.hash='equipment';
   requestAnimationFrame(()=>document.getElementById(`gear-${gear.id}`)?.scrollIntoView({block:'start'}));
 });
-setupOptions();setupBuildLab();renderClassLibrary();renderOriginHints('');renderBuilds();renderGear();renderJourney();renderQuests();route();
+setupOptions();setupBuildLab();setupInspirations();renderClassLibrary();renderOriginHints('');renderBuilds();renderGear();renderJourney();renderInspirations();route();
