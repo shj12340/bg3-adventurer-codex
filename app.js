@@ -1,4 +1,5 @@
 'use strict';
+function route(){let view=location.hash.slice(1)||'builds';if(view==='quests')view='inspirations';if(!titles[view])view='builds';document.querySelectorAll('.view').forEach(section=>section.hidden=section.id!==view);document.querySelectorAll('nav a').forEach(link=>{const active=link.getAttribute('href')===`#${view}`;link.classList.toggle('active',active);active?link.setAttribute('aria-current','page'):link.removeAttribute('aria-current');});$('page-title').textContent=titles[view][0];$('page-description').textContent=titles[view][1];document.title=`${titles[view][0]} · 费伦冒险手册`;}
 const $=id=>document.getElementById(id);
 const escapeHTML=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const ACT_ONE_PROGRESS_KEY='bg3-codex-act1-progress-v1';
@@ -22,7 +23,6 @@ const walkthroughSteps=()=>state.journey===3?ACT_THREE_STEPS:state.journey===2?A
 const walkthroughModule=()=>state.journey===3?state.actThreeModule:state.journey===2?state.actTwoModule:state.actOneModule;
 const walkthroughProgress=()=>state.journey===3?state.actThreeProgress:state.journey===2?state.actTwoProgress:state.actOneProgress;
 const titles={builds:['找到属于你的战斗方式','先选职业主轴，再把每一级、每件装备与每次冒险连在一起。'],journey:['分章节冒险流程','按区域和不可逆节点推进，不错过重要救援、商人和装备。'],equipment:['构筑向装备图鉴','按 BD、章节、部位和推荐强度筛选；先看为什么适合，再决定给谁。'],inspirations:['角色激励点','按背景、起源与角色查找激励事件及触发提示。']};
-titles.laboratory=['构筑实验室','按职业、目标与机制偏好规划路线，查看每一颗星和每一级选择的依据。'];
 const buildById=id=>BUILD_LIBRARY.find(build=>build.id===id);
 const gearById=id=>GEAR.find(gear=>gear.id===id);
 const classById=id=>CLASS_LIBRARY.find(klass=>klass.id===id);
@@ -167,71 +167,6 @@ function renderInspirations(){
   $('inspiration-count').textContent=`找到 ${rows.length} / ${INSPIRATIONS.length} 条激励点`;
   $('inspiration-list').innerHTML=rows.length?rows.map(item=>`<article class="inspiration-card"><div class="inspiration-meta"><span class="tag">${escapeHTML(item.background)}</span><span>${escapeHTML(item.character)}</span><span>${item.chapter==='其他'?'其他':`第${['','一','二','三'][item.chapter]}章`}</span></div><h2>${escapeHTML(item.title)}</h2><p>${escapeHTML(item.detail)}</p></article>`).join(''):'<p class="empty">没有符合条件的激励点。试试清除筛选。</p>';
 }
-const labGoalLabels={'melee-burst':'近战爆发','ranged-sustain':'远程持续','spell-burst':'法术爆发',control:'控场',healing:'治疗减伤',throwing:'投掷',summon:'召唤',exploration:'探索功能'};
-const labDimensionLabels={pressure:'输出／压制',survival:'生存',actionEconomy:'行动经济',smoothness:'成型平滑度',resourceEfficiency:'资源效率',gearDependence:'装备依赖'};
-const labExploitLabels={'infinite-spell-slots':'无限法术位','merchant-refresh-theft':'商人库存／偷窃刷新','camp-persistent-buffs':'营地长期增益'};
-
-function setupBuildLab(){
-  $('build-lab-class').insertAdjacentHTML('beforeend',CLASS_LIBRARY.map(item=>`<option value="${escapeHTML(item.id)}">${escapeHTML(item.name)}</option>`).join(''));
-  $('build-lab-goal').innerHTML=BUILD_LAB_GOAL_IDS.map(id=>`<option value="${escapeHTML(id)}" ${id==='control'?'selected':''}>${escapeHTML(labGoalLabels[id]||id)}</option>`).join('');
-  $('build-lab-mechanic-options').innerHTML=BUILD_MECHANICS.map(item=>`<label><input type="checkbox" name="mechanicIds" value="${escapeHTML(item.id)}"><span>${escapeHTML(item.name)}</span></label>`).join('');
-}
-function readBuildLabForm(){
-  const form=new FormData($('build-lab-form'));
-  return normalizeBuildLabInput({classId:form.get('classId'),goalId:form.get('goalId'),mechanicIds:form.getAll('mechanicIds'),act:Number(form.get('act')),difficulty:form.get('difficulty'),exploitPolicy:form.get('exploitPolicy')});
-}
-function labSource(url,label='核对来源'){
-  try{if(new URL(url).protocol==='https:')return `<a class="source" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer">${escapeHTML(label)} ↗</a>`;}catch{/* Unusable references remain text rather than becoming executable links. */}
-  return `<span class="muted">${escapeHTML(label)}：${escapeHTML(url)}</span>`;
-}
-function labSources(sources){return `<ul class="lab-sources">${sources.map((url,index)=>`<li>${labSource(url,`来源 ${index+1} · ${sourceName(url)}`)}</li>`).join('')}</ul>`;}
-function labList(items){return `<ul>${items.map(item=>`<li>${escapeHTML(item)}</li>`).join('')}</ul>`;}
-function labStars(value){return `<span class="lab-stars" aria-label="${escapeHTML(value)} / 5 星"><span aria-hidden="true">★</span> ${escapeHTML(value)} <small>/ 5</small></span>`;}
-function labCatalogGear(item){
-  const sourceKey=url=>{try{const parsed=new URL(url);return parsed.protocol==='https:'?parsed.hostname+decodeURIComponent(parsed.pathname).replace(/\/$/,''):'';}catch{return '';}};
-  const key=sourceKey(item.source);
-  return key?GEAR.find(gear=>[...(gear.sources||[]),wiki(gear.url)].some(url=>sourceKey(url)===key)):undefined;
-}
-function labGearPlan(archetype,input){
-  return `<details class="lab-gear"><summary>装备与当前章节替代</summary><div class="lab-gear-list">${archetype.gearPlan.currentAct.map(item=>{
-    const gear=labCatalogGear(item),future=input.act!==12&&item.act>input.act;
-    return `<section><h4>${escapeHTML(gear?.name||item.name)}</h4><p class="muted">第 ${escapeHTML(item.act)} 章 · ${escapeHTML(item.slot)}${future?' · 当前章节尚不可得':''}</p><p>${escapeHTML(item.alternative)}</p>${gear?`<button type="button" class="action" data-lab-gear="${escapeHTML(gear.id)}">查看装备图鉴 →</button>`:''}<p>${labSource(item.source,'装备来源')}</p><ul>${(item.alternatives||[]).map(alternative=>`<li><strong>${escapeHTML(alternative.name)}</strong> · 第 ${escapeHTML(alternative.act)} 章<br>${escapeHTML(alternative.reason)} ${labSource(alternative.source,'替代来源')}</li>`).join('')}</ul></section>`;
-  }).join('')}</div></details>`;
-}
-function labLevelCard(card,archetype){
-  const step=archetype.route[card.level-1];
-  return `<details class="lab-level" data-level="${escapeHTML(card.level)}"><summary>等级 ${escapeHTML(card.level)} · ${escapeHTML(classById(step?.classId)?.name||step?.classId)} ${escapeHTML(step?.classLevel)}</summary><div class="lab-level-body"><section class="lab-required"><h4>本级必选／路线决定</h4><p>${escapeHTML(card.required)}</p><p class="muted">${escapeHTML(card.requiredReason)}</p></section><section><h4>推荐顺序</h4><ol class="lab-priorities">${[...card.recommended].sort((a,b)=>a.priority-b.priority).map(item=>`<li data-priority="${escapeHTML(item.priority)}"><span class="lab-priority">优先 ${escapeHTML(item.priority)}</span><strong>${escapeHTML(item.choice)}</strong>${item.condition?`<p>条件：${escapeHTML(item.condition)}</p>`:''}<p>${escapeHTML(item.reason)}</p>${labSource(item.source)}</li>`).join('')}</ol></section><section class="lab-alternatives"><h4>条件替换</h4>${labList(card.alternatives)}</section><section class="lab-avoid"><h4>不推荐／避免</h4>${labList(card.avoid)}</section><section><h4>操作提示</h4><p>${escapeHTML(card.operation)}</p></section>${labSources(card.sources)}</div></details>`;
-}
-function labExploitDetails(cards){
-  if(!cards.length)return '';
-  return `<details class="lab-exploits"><summary>常见机制利用 · 比较与限制（默认折叠）</summary>${cards.map(card=>{
-    return `<section class="lab-exploit" data-policy-id="${escapeHTML(card.policyId)}"><h4>${escapeHTML(labExploitLabels[card.policyId]||card.policyId)}</h4><p class="muted">${escapeHTML(card.version)} · 核对 ${escapeHTML(card.checkedAt)}</p><p class="lab-exploit-status">${escapeHTML(card.assessmentLabel)}</p><p>常规星级：${card.normalStars===null?'未发布':labStars(card.normalStars)} · 机制利用星级：${card.effectiveStars===null?'不适用／不计入评分':labStars(card.effectiveStars)}</p><p>${escapeHTML(card.reason)}</p><p class="lab-exploit-honour"><strong>${escapeHTML(card.honourLabel)}</strong> · ${escapeHTML(card.honourReason)}</p>${card.procedure.length?`<section class="lab-exploit-procedure"><h5>操作步骤</h5><ol>${card.procedure.map(step=>`<li>${escapeHTML(step)}</li>`).join('')}</ol></section>`:''}${card.benefit?`<p class="lab-exploit-benefit"><strong>收益与上限：</strong>${escapeHTML(card.benefit)}</p>`:''}${card.risks.length?`<section class="lab-exploit-risks"><h5>风险与后果</h5>${labList(card.risks)}</section>`:''}<p><strong>关闭时的替代路线：</strong>${escapeHTML(card.normalRouteAlternative)}</p>${labSources(card.sources)}</section>`;
-  }).join('')}</details>`;
-}
-function labResultCard(result,input,index){
-  const {archetype,score}=result;
-  const blocking=result.conflicts.some(item=>item.severity==='blocking');
-  const extraWarnings=result.warnings.filter(message=>!result.conflicts.some(item=>item.message===message)&&message!==archetype.lowStarRemedy);
-  const split=archetype.finalSplit.replace(/[a-z]+/g,id=>classById(id)?.name||id);
-  const mechanics=archetype.mechanicIds.map(id=>BUILD_MECHANICS.find(item=>item.id===id)?.name||id).join(' · ');
-  return `<article class="lab-result" data-archetype-id="${escapeHTML(archetype.id)}"><div class="lab-result-heading"><div><p class="eyebrow">路线 ${escapeHTML(index+1)} · ${escapeHTML(classById(archetype.primaryClassId)?.name)}</p><h2>${escapeHTML(archetype.subclass)} · ${escapeHTML(mechanics)}</h2><p class="split">${escapeHTML(split)}</p></div><span class="tag ${blocking?'lab-block-tag':'recommend'}">${blocking?'存在阻塞 · 先修复':'候选路线'}</span></div><p>${escapeHTML(archetype.coreLoop)}</p><div class="detail-badges"><span class="tag">${escapeHTML(archetype.version)}</span><span class="tag">核对 ${escapeHTML(archetype.checkedAt)}</span><span class="tag">${escapeHTML(archetype.goalIds.map(id=>labGoalLabels[id]||id).join(' · '))}</span></div><div class="lab-ratings">${[['current','当前进度'],['wholeGame','全程'],['endgame','终盘']].map(([key,label])=>`<div data-rating="${key}"><span>${label}</span>${labStars(score[key])}</div>`).join('')}</div><p class="muted">${escapeHTML(archetype.scoreBasis?.method)}</p>
-    ${score.current<=2||blocking?`<aside class="lab-remedy"><h3>低星短板与补救</h3><p>${escapeHTML(archetype.lowStarRemedy)}</p></aside>`:''}
-    ${extraWarnings.length?`<aside class="lab-warning">${labList(extraWarnings)}</aside>`:''}
-    ${blocking?`<aside class="lab-blocking"><h3>阻塞冲突 · 解除前不可执行</h3>${labList(result.conflicts.filter(item=>item.severity==='blocking').map(item=>item.message))}<p>常规评分（未考虑阻塞）：当前 ${labStars(score.normal.current)} · 全程 ${labStars(score.normal.wholeGame)} · 终盘 ${labStars(score.normal.endgame)}</p></aside>`:''}
-    <details class="lab-score-details"><summary>为什么推荐 · 六项评分与依据</summary><div class="lab-dimensions">${Object.entries(labDimensionLabels).map(([id,label])=>`<section data-dimension="${escapeHTML(id)}"><h3>${escapeHTML(label)} ${labStars(score.dimensions[id].score)}</h3><p>${escapeHTML(score.dimensions[id].reason)}</p>${id==='gearDependence'?`<p class="muted">${escapeHTML(archetype.scoreBasis?.gearDependence)}</p>`:''}</section>`).join('')}</div>${labList(score.reasons)}</details>
-    <details class="lab-conflicts"><summary>规则警告与冲突 · ${escapeHTML(result.conflicts.length)} 项</summary><ul>${result.conflicts.map(item=>`<li class="${item.severity==='blocking'?'lab-blocking':'lab-warning'}"><strong>${item.severity==='blocking'?'阻塞':'注意'}</strong> · ${escapeHTML(item.message)} ${labSource(item.source)}</li>`).join('')}</ul></details>
-    <details class="lab-route"><summary>起始属性与实战路线</summary><div class="lab-attributes">${archetype.startingAttributes.map(item=>`<span>${escapeHTML(item.ability)} <strong>${escapeHTML(item.value)}</strong></span>`).join('')}</div><p><strong>背景：</strong>${escapeHTML(archetype.background)}</p><p><strong>关键节点：</strong>${escapeHTML(archetype.coreLevels.join(' / '))}</p><p>${escapeHTML(archetype.coreLevelRationale)}</p><p>${escapeHTML(archetype.respecPlan)}</p><p>${escapeHTML(archetype.normalRoute)}</p><p>${escapeHTML(archetype.coreLoop)}</p></details>
-    <details class="lab-levels"><summary>1–12 级升级决策 · 展开后选择等级</summary><div class="lab-level-grid">${[...result.levelDecisions].sort((a,b)=>a.level-b.level).map(card=>labLevelCard(card,archetype)).join('')}</div></details>
-    ${labGearPlan(archetype,input)}${labExploitDetails(result.visibleExploitCards)}<details class="lab-reference-details"><summary>机制与路线来源 · ${escapeHTML(result.sources.length)} 条</summary>${labSources(result.sources)}</details></article>`;
-}
-function renderBuildLab(){
-  const input=readBuildLabForm();
-  const results=generateBuildRecommendations(input).slice(0,3);
-  $('build-lab-results').innerHTML=results.map((result,index)=>labResultCard(result,input,index)).join('');
-  $('build-lab-status').textContent=results.length?`已生成 ${results.length} 条路线。当前选择：${classById(input.classId)?.name||'尚未决定职业'} · ${labGoalLabels[input.goalId]}。展开卡片查看选择依据。`:'没有符合当前职业与目标的路线。请更换战斗目标，或将起点职业设为“尚未决定”。';
-}
-function route(){let view=location.hash.slice(1)||'builds';if(view==='quests')view='inspirations';if(!titles[view])view='builds';document.querySelectorAll('.view').forEach(section=>section.hidden=section.id!==view);document.querySelectorAll('nav a').forEach(link=>{const active=link.getAttribute('href')===`#${view}`;link.classList.toggle('active',active);active?link.setAttribute('aria-current','page'):link.removeAttribute('aria-current');});$('page-title').textContent=titles[view][0];$('page-description').textContent=titles[view][1];document.title=`${titles[view][0]} · 费伦冒险手册`;}
-
 ['character','difficulty','style-filter','build-scope'].forEach(id=>$(id)?.addEventListener('change',()=>{if(id==='character')renderOriginHints($('character').value);renderClassLibrary();renderBuilds();}));
 $('query').addEventListener('input',renderBuilds);
 $('reset').addEventListener('click',()=>{$('character').value='';$('difficulty').value='tactician';$('style-filter').value='';$('query').value='';if($('build-scope'))$('build-scope').value='recommended';state.classId='';renderClassLibrary();renderOriginHints('');renderBuilds();});
@@ -260,13 +195,4 @@ document.addEventListener('click',event=>{
   const regionButton=event.target.closest('[data-region]');if(regionButton){const region=REGION_GUIDES.find(item=>item.id===regionButton.dataset.region);state.selectedRegion=regionButton.dataset.region;state.journey=region?.act||state.journey;renderJourney();return;}
 });
 $('close-dialog').addEventListener('click',()=>$('build-dialog').close());$('build-dialog').addEventListener('close',()=>document.body.style.overflow='');window.addEventListener('hashchange',()=>{route();if(state.pendingReturnStep&&location.hash==='#journey'){const id=state.pendingReturnStep;state.pendingReturnStep='';requestAnimationFrame(()=>{const target=document.getElementById(`act-one-step-${id}`);target?.scrollIntoView({block:'start'});target?.focus({preventScroll:true});});}else scrollTo(0,0);});
-$('build-lab-form').addEventListener('submit',event=>{event.preventDefault();renderBuildLab();});
-$('build-lab-results').addEventListener('click',event=>{
-  const button=event.target.closest('[data-lab-gear]');if(!button)return;
-  const gear=gearById(button.dataset.labGear);if(!gear)return;
-  state.gearReturnStep='';$('gear-query').value=gear.name;
-  ['gear-act','gear-build','gear-slot','gear-tier'].forEach(id=>$(id).value='');
-  renderGear();location.hash='equipment';
-  requestAnimationFrame(()=>document.getElementById(`gear-${gear.id}`)?.scrollIntoView({block:'start'}));
-});
-setupOptions();setupBuildLab();setupInspirations();renderClassLibrary();renderOriginHints('');renderBuilds();renderGear();renderJourney();renderInspirations();route();
+setupOptions();setupInspirations();renderClassLibrary();renderOriginHints('');renderBuilds();renderGear();renderJourney();renderInspirations();route();
